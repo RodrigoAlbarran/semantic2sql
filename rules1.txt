@@ -1,0 +1,988 @@
+# -*- coding: utf-8 -*-
+# Owlready2
+# Copyright (C) 2019 Jean-Baptiste LAMY
+# LIMICS (Laboratoire d'informatique médicale et d'ingénierie des connaissances en santé), UMR_S 1142
+# University Paris 13, Sorbonne paris-Cité, Bobigny, France
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+
+# You should have received a copy of the GNU Lesser General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+STAGE "1 Initialize"
+
+PREPROCESS "equivalence"
+IF    { ?A equivalent_class ?B }
+OR    { ?B equivalent_class ?A }
+INFER { ?A is_a(1) ?B }
+
+
+PREPROCESS "and_flat_list" BUILTIN "CreateFlatList" { <http://www.w3.org/2002/07/owl#intersectionOf> }
+
+PREPROCESS "or_flat_list" BUILTIN "CreateFlatList" { <http://www.w3.org/2002/07/owl#unionOf>
+                                                     <http://www.w3.org/2002/07/owl#oneOf> }
+                                              
+PREPROCESS "disjoint_flat_list" BUILTIN "CreateFlatList" { <http://www.w3.org/2002/07/owl#members>
+                                                           <http://www.w3.org/2002/07/owl#distinctMembers> }
+
+PREPROCESS "not_flat_list" BUILTIN "CreateSingleElementFlatList" { <http://www.w3.org/2002/07/owl#complementOf> }
+
+PREPROCESS "inverse_flat_list" BUILTIN "CreateSingleElementFlatList" { <http://www.w3.org/2002/07/owl#inverseOf> }
+
+
+PREPROCESS "normalize_constructs" BUILTIN "NormalizeConstructs" {  }
+
+PREPROCESS "or_key_list" BUILTIN "CreateKeyList" { <http://www.w3.org/2002/07/owl#unionOf> }
+
+PREPROCESS RECURSIVE "prop_is_a_transitivity"
+IF {
+  ?A subproperty_of ?B
+  ?B subproperty_of ?C
+}
+INFER {
+  ?A subproperty_of ?C
+}
+
+# PREPROCESS "domain"
+# IF {
+#   ?P domain ?D
+#   ?D != Thing
+# }
+# INFER {
+#   (?P some Thing) is_a(1) ?D
+# }
+PREPROCESS "domain"
+IF {
+  ?P domain ?D
+  ?D != Thing
+  ?A = (?P some ?V)
+}
+INFER {
+  ?A is_a(1) ?D
+}
+
+PREPROCESS "range"
+IF {
+  ?P range ?R
+  ?R != Thing
+}
+INFER {
+  Thing is_a(1) (?P only ?R)
+}
+# PREPROCESS "range"
+# IF {
+#   ?P range ?R
+#   ?R != Thing
+#   ?A type Class
+#   ?A > 0
+#   ?A != Thing
+# }
+# INFER {
+#   ?A is_a(2) (?P only ?R)
+# }
+# PREPROCESS "range_1"
+# IF {
+#   ?P range ?R
+#   ?R != Thing
+# }
+# INFER {
+#   (?P only ?R) is_a(3) (?P only ?R)
+# }
+# PREPROCESS "range_2"
+# IF {
+#   ?P range ?R
+#   ?R != Thing
+#   ?A type Class
+#   ?A > 0
+#   ?A != Thing
+#   ?ONLY = (?P only ?R)
+# }
+# INFER {
+#   ?A is_a(2) ?ONLY
+# }
+
+
+STAGE "2 Determine needed inferences"
+
+
+PREPROCESS "infer_descendants_entity"
+IF {
+  ?A type Class
+  ?A > 0
+}
+OR {
+  ?A type NamedIndividual
+  ?A > 0
+}
+INFER {
+  ?A infer_descendants
+}
+
+PREPROCESS "infer_ancestors_entity"
+IF {
+  ?A type Class
+  ?A > 0
+}
+OR {
+  ?A type NamedIndividual
+  ?A > 0
+}
+INFER {
+  ?A infer_ancestors
+}
+
+COMPLETION "infer_descendants_is_a"
+IF {
+  ?X is_a ?Y
+  ?Y infer_descendants
+}
+INFER {
+  ?X infer_descendants
+}
+
+COMPLETION "infer_ancestors_is_a"
+IF {
+  ?Y is_a ?X
+  ?Y infer_ancestors
+}
+INFER {
+  ?X infer_ancestors
+}
+
+
+# COMPLETION "infer_descendants_and_is_a"
+# IF {
+#   ?AND = (?X and)
+#   ?AND is_a ?Y
+#   ?Y infer_descendants
+# }
+# INFER {
+#   ?AND infer_descendants
+# }
+
+# COMPLETION "infer_descendants_or_is_a"
+# IF {
+#   ?OR = (?X or)
+#   ?OR is_a ?Y
+#   ?Y infer_descendants
+# }
+# INFER {
+#   ?OR infer_descendants
+# }
+
+# COMPLETION "infer_ancestors_and_is_a"
+# IF {
+#   ?AND = (?X and)
+#   ?Y is_a ?AND
+#   ?Y infer_ancestors
+# }
+# INFER {
+#   ?AND infer_ancestors
+# }
+
+# COMPLETION "infer_ancestors_or_is_a"
+# IF {
+#   ?OR = (?X or)
+#   ?Y is_a ?OR
+#   ?Y infer_ancestors
+# }
+# INFER {
+#   ?OR infer_ancestors
+# }
+
+
+COMPLETION "infer_descendants_inner_1"
+IF {
+  ?OUTER = (?INNER and)
+  ?OUTER infer_descendants
+}
+INFER {
+  ?INNER infer_descendants
+}
+
+COMPLETION "infer_descendants_inner_2"
+IF {
+  ?OUTER = (?INNER or)
+  ?OUTER infer_descendants
+}
+INFER {
+  ?INNER infer_descendants
+}
+
+
+COMPLETION "infer_ancestors_inner_1"
+IF {
+  ?OUTER = (?INNER and)
+  ?OUTER infer_ancestors
+}
+INFER {
+  ?INNER infer_ancestors
+}
+
+COMPLETION "infer_ancestors_inner_2"
+IF {
+  ?OUTER = (?INNER or)
+  ?OUTER infer_ancestors
+}
+INFER {
+  ?INNER infer_ancestors
+}
+
+
+# COMPLETION "infer_descendants_some_is_a"
+# IF {
+#   ?SOME = (?P some ?V)
+#   ?SOME is_a ?Y
+#   ?Y infer_descendants
+# }
+# INFER {
+#   ?SOME infer_descendants
+# }
+# COMPLETION "infer_ancestors_some_is_a"
+# IF {
+#   ?SOME = (?P some ?V)
+#   ?Y is_a ?SOME
+#   ?Y infer_ancestors
+# }
+# INFER {
+#   ?SOME infer_ancestors
+# }
+
+
+COMPLETION "infer_descendants_some"
+IF {
+  ?SOME infer_descendants
+  ?SOME = (?P some ?V)
+}
+INFER {
+  ?V infer_descendants
+}
+
+COMPLETION "infer_ancestors_some"
+IF {
+  ?SOME infer_ancestors
+  ?SOME = (?P some ?V)
+}
+INFER {
+  ?V infer_ancestors
+}
+
+COMPLETION "infer_descendants_only"
+IF {
+  ?ONLY infer_ancestors
+  ?ONLY = (?P only ?V)
+}
+INFER {
+  ?V infer_descendants
+}
+
+COMPLETION "infer_ancestors_only"
+IF {
+  ?ONLY infer_descendants
+  ?ONLY = (?P only ?V)
+}
+INFER {
+  ?V infer_ancestors
+}
+
+
+
+
+STAGE "3 Create linked lists"
+
+PREPROCESS "and_linked_list" BUILTIN "CreateLinkedList" { <http://www.w3.org/2002/07/owl#intersectionOf> }
+
+PREPROCESS "or_linked_list" BUILTIN "CreateLinkedList" { <http://www.w3.org/2002/07/owl#unionOf> }
+
+
+STAGE "4 Compute inferences"
+
+
+PREPROCESS "prop_is_a_self"
+IF    { ?A type ObjectProperty }
+OR    { ?A type DatatypeProperty }
+INFER { ?A subproperty_of ?A }
+
+COMPLETION "is_a_self"
+IF    { ?A type Class } # Also include or, and, not
+OR    { ?A type NamedIndividual }
+OR    { ?A = (?R some ?X) }
+OR    { ?A = (?R only ?X) }
+OR    { ?A = (?R max ?nb ?X) }
+INFER { ?A is_a(3) ?A }
+
+COMPLETION "is_a_thing"
+IF    { ?A type Class } # Also include or, and, not
+OR    { ?A type NamedIndividual }
+OR    { ?A = (?R some ?X) }
+OR    { ?A = (?R only ?X) }
+OR    { ?A = (?R max ?nb ?X) }
+INFER { ?A is_a(2) Thing }
+
+PREPROCESS "nothing"
+IF { } INFER {
+  Nothing is_a(2) Thing
+  Nothing is_a(2) Nothing
+  new (Thing pairwise_disjoint Nothing)
+}
+
+#################################################################
+
+COMPLETION HIGH_PRIORITY RECURSIVE "is_a_transitivity_1"
+IF {
+  ?A is_a(<=2) ?B
+  ?B is_a(1) ?C
+}
+INFER {
+  ?A is_a(2) ?C
+}
+
+COMPLETION HIGH_PRIORITY RECURSIVE "is_a_transitivity_2"
+IF {
+#   ?A is_a ?B      # equivalent to is_a(<=5), since there are only 5 levels
+  ?A is_a(!=3) ?B   #
+  ?B is_a(4) ?C
+}
+INFER {
+  ?A is_a(5) ?C
+}
+
+
+COMPLETION HIGH_PRIORITY "and_1"
+IF {
+  ?AND is_a (?X and ?...)
+}
+INFER {
+  ?AND is_a(2) ?X
+}
+
+COMPLETION RECURSIVE "and_2"
+IF {
+  ?AND = (?X and ?Y)
+  ?X < ?Y
+  ?A is_a ?X
+  ?A is_a ?Y
+}
+INFER {
+  ?A is_a(2) ?AND
+}
+
+
+COMPLETION HIGHEST_PRIORITY "or_1"
+IF {
+  (?X or ?...) is_a ?A
+}
+INFER {
+  ?X is_a(4) ?A
+}
+
+COMPLETION "or_2"
+IF {
+  ?OR = (?X or ?Y)
+  ?X < ?Y
+  ?X is_a ?Z
+  ?Y is_a ?Z
+}
+INFER {
+  ?OR is_a(4) ?Z
+}
+
+COMPLETION "and_2_or_1"
+IF {
+  ?AND = (?X and ?Y)
+  ?A  is_a(<=3) (?X1 or ?...)
+  #?X1_OR = (?X1 or ?...)
+  #?A  is_a(<=3) ?X1_OR
+  ?A  is_a ?Y
+  ?X1 is_a ?X
+#  ?Y != ?X1_OR
+#  ?A != ?AND
+}
+INFER {
+  ?A is_a(2) (?AND or ?...)
+}
+
+COMPLETION "and_2_or_2"
+IF {
+  ?AND  = (?X and ?Y)
+  ?X < ?Y
+  ?OR_X = (?X1 or ?...)
+  ?OR_Y = (?Y1 or ?...)
+  ?X1 is_a ?X
+  ?Y1 is_a ?Y
+  ?A  is_a(<=3) ?OR_X
+  ?A  is_a(<=3) ?OR_Y
+  ?OR_X != ?OR_Y         # If ?OR_X = ?OR_Y, the inference is trivial
+}
+INFER {
+  ?A is_a(2) (?AND or ?...)
+}
+
+##################################################################
+
+PREPROCESS "not"
+IF {
+  ?NOT = (not ?A)
+}
+INFER {
+  new (?A pairwise_disjoint ?NOT)
+  Thing is_a(1) (?A or ?NOT)
+}
+
+PREPROCESS "disjoint_pair"
+IF {
+  ?A disjoint_with ?B
+}
+INFER {
+  new (?A pairwise_disjoint ?B)
+}
+
+COMPLETION "disjoint_1"
+IF {
+  ?D disjoint_member ?A
+  ?D disjoint_member ?B
+  ?A < ?B
+  ?X is_a ?A
+  ?X is_a ?B
+}
+INFER {
+  ?X is_a(2) Nothing
+}
+
+COMPLETION "disjoint_or_1"
+IF {
+  ?D disjoint_member ?A
+  ?D disjoint_member ?B
+  ?A != ?B
+  ?A1 is_a       ?A
+  ?X  is_a(<=3) (?A1 or ?...)
+  ?X  is_a       ?B
+  ?X != Nothing
+}
+INFER {
+  ?X is_a(2) (?... or)
+}
+
+COMPLETION "disjoint_or_2"
+IF {
+  ?D disjoint_member ?A
+  ?D disjoint_member ?B
+  ?A < ?B
+  ?A1 is_a ?A
+  ?B1 is_a ?B
+  ?OR_A = (?A1 or ?...)
+  ?OR_B = (?B1 or ?...)
+  ?OR_A != ?OR_B
+  ?X is_a(<=3) ?OR_A
+  ?X is_a(<=3) ?OR_B
+  ?X != Nothing
+}
+INFER {
+  ?X is_a(2) (?... or)
+}
+
+COMPLETION HIGH_PRIORITY "some_subprop_subclass"
+IF {
+  ?SOME  = (?P  some ?V)
+  ?SOME1 = (?P1 some ?V1)
+  ?SOME1 != ?SOME
+  ?P1 subproperty_of ?P
+  ?V1 is_a ?V
+}
+INFER {
+  ?SOME1 is_a(1) ?SOME
+}
+
+COMPLETION "some_or"
+IF {
+  ?P1 subproperty_of ?P
+  ?SOME = (?P1 some ?V)
+#  ?SOME infer_ancestors
+  ?V is_a(<=3) (?A or ?...)
+}
+INFER {
+  ?SOME is_a(1) ((?P1 some ?A) or ?...)
+}
+
+
+
+
+COMPLETION HIGH_PRIORITY "some_nothing"
+IF {
+  ?A = (?P some ?V)
+  ?V is_a Nothing
+}
+INFER {
+  ?A is_a(1) Nothing
+}
+
+
+COMPLETION HIGH_PRIORITY "only_subprop_subclass"
+IF {
+  ?ONLY  = (?P1 only ?V)
+  ?ONLY1 = (?P  only ?V1)
+  ?ONLY1 != ?ONLY
+  ?V1 is_a ?V
+  ?P1 subproperty_of ?P
+}
+INFER {
+  ?ONLY1 is_a(1) ?ONLY
+}
+
+COMPLETION "only_and"
+IF {
+  ?X is_a (?P  only ?A1)
+  ?X is_a (?P1 only ?B1)
+  ?P1 subproperty_of ?P
+  ?A1 != ?B1
+  ?AND = (?A and ?B)
+  #?AND is_a Thing # Ensure that ?AND is not an inner component of an intersection with more than 2 elements
+  #?A < ?B
+  ?A1 is_a ?A
+  ?B1 is_a ?B
+}
+INFER {
+  ?X is_a(2) (?P1 only ?AND)
+}
+
+COMPLETION "only_and_or_1"
+IF {
+  ?A1_OR is_a(<=3) (?A1 or ?...)
+  ?X is_a (?P  only ?A1_OR)
+  ?X is_a (?P1 only ?B1)
+  ?P1 subproperty_of ?P
+  ?A1_OR != ?B1
+  ?AND = (?A and ?B)
+  #?AND is_a Thing # Ensure that ?AND is not an inner component of an intersection with more than 2 elements
+  ?A1 is_a ?A
+  ?B1 is_a ?B
+}
+INFER {
+  ?X is_a(2) (?P1 only (?AND or ?...))
+}
+
+COMPLETION "only_and_or_2" # Same as above, but with ?P and ?P1 swapped
+IF {
+  ?A1_OR is_a(<=3) (?A1 or ?...)
+  ?X is_a (?P1 only ?A1_OR)
+  ?X is_a (?P  only ?B1)
+  ?P1 subproperty_of ?P
+  ?P1 != ?P # If ?P1 = ?P, then the rule is the same as above => not needed
+  ?A1_OR != ?B1
+  ?AND = (?A and ?B)
+  #?AND is_a Thing # Ensure that ?AND is not an inner component of an intersection with more than 2 elements
+  ?A1 is_a ?A
+  ?B1 is_a ?B
+}
+INFER {
+  ?X is_a(2) (?P1 only (?AND or ?...))
+}
+
+COMPLETION "only_and_or_3"
+IF {
+  ?A1_OR is_a(<=3) (?A1 or ?...)
+  ?B1_OR is_a(<=3) (?B1 or ?...)
+  ?X is_a (?P  only ?A1_OR)
+  ?X is_a (?P1 only ?B1_OR)
+  ?P1 subproperty_of ?P
+  ?A1_OR != ?B1_OR
+  ?AND = (?A and ?B)
+  #?AND is_a Thing # Ensure that ?AND is not an inner component of an intersection with more than 2 elements
+  #?A < ?B
+  ?A1 is_a ?A
+  ?B1 is_a ?B
+}
+INFER {
+  ?X is_a(2) (?P1 only (?AND or ?...))
+}
+
+COMPLETION LOWEST_PRIORITY "only_disjoint"
+IF {
+  ?X is_a (?P  only ?A1)
+  ?X is_a (?P1 only ?B1)
+  ?P1 subproperty_of ?P
+  ?D disjoint_member ?A
+  ?D disjoint_member ?B
+  ?A != ?B
+  ?A1 is_a ?A
+  ?B1 is_a ?B
+}
+INFER {
+  ?X is_a(2) (?P1 only Nothing)
+}
+
+COMPLETION LOWEST_PRIORITY "only_disjoint_or_1"
+IF {
+  ?OR_A is_a(<=3) (?A1 or ?...)
+  ?X is_a (?P  only ?OR_A)
+  ?X is_a (?P1 only ?B1)
+  ?P1 subproperty_of ?P
+  ?D disjoint_member ?A
+  ?D disjoint_member ?B
+  ?A != ?B
+  ?A1 is_a ?A
+  ?B1 is_a ?B
+}
+INFER {
+  ?X is_a(2) (?P1 only (?... or))
+}
+
+COMPLETION LOWEST_PRIORITY "only_disjoint_or_2"
+IF {
+  ?OR_A is_a(<=3) (?A1 or ?...)
+  ?OR_B is_a(<=3) (?B1 or ?...)
+  ?X is_a (?P  only ?OR_A)
+  ?X is_a (?P1 only ?OR_B)
+  ?P1 subproperty_of ?P
+  ?D disjoint_member ?A
+  ?D disjoint_member ?B
+  ?A < ?B
+  ?A1 is_a ?A
+  ?B1 is_a ?B
+}
+INFER {
+  ?X is_a(2) (?P only (?... or))
+}
+
+COMPLETION "some_only"
+IF {
+  ?A is_a (?P  only ?V1)
+  ?A is_a (?P1 some ?V)
+  ?P1 subproperty_of ?P
+  ?V1 is_a ?V
+  ?V1 != ?V
+}
+INFER {
+  ?A is_a(2) (?P1 some ?V1)
+}
+
+COMPLETION "some_only_or_1"
+IF {
+  ?ONLY is_a (?P  only ?V1)
+  ?ONLY_OR = (?ONLY or ?...)
+  ?A is_a(<=3) ?ONLY_OR
+  ?A is_a (?P1 some ?V)
+  ?P1 subproperty_of ?P
+  ?V1 is_a ?V
+  ?V1 != ?V
+  ?A infer_ancestors
+}
+INFER {
+  ?A is_a(2) ((?P1 some ?V1) or ?...)
+}
+
+COMPLETION "some_only_or_2"
+IF {
+  ?SOME is_a (?P1 some ?V)
+  ?SOME_OR = (?SOME or ?...)
+  ?A is_a (?P  only ?V1)
+  ?A is_a(<=3) ?SOME_OR
+  ?P1 subproperty_of ?P
+  ?V1 is_a ?V
+  ?V1 != ?V
+#  ?A infer_ancestors
+}
+INFER {
+  ?A is_a(2) ((?P1 some ?V1) or ?...)
+}
+
+COMPLETION "some_only_or_3"
+IF {
+  ?SOME is_a (?P1 some ?V)
+  ?SOME_OR = (?SOME or ?...)
+  ?ONLY is_a (?P  only ?V1)
+  ?ONLY_OR = (?ONLY or ?...)
+  ?A is_a(<=3) ?ONLY_OR
+  ?A is_a(<=3) ?SOME_OR
+  ?P1 subproperty_of ?P
+  ?V1 is_a ?V
+  ?V1 != ?V
+  ?A infer_ancestors
+  #?A > 0
+}
+INFER {
+  ?A is_a(2) ((?P1 some ?V1) or ?...)
+}
+
+COMPLETION "some_only_and_1"
+IF {
+  ?A is_a (?P  only ?V1)
+  ?A is_a (?P1 some ?W1)
+  ?P1 subproperty_of ?P
+  ?AND = (?V and ?W)
+  ?AND = (?ZZZ and) # Ensure that ?AND is not an inner component of an intersection with more than 2 elements
+  ?V1 is_a ?V
+  ?W1 is_a ?W
+}
+INFER {
+  ?A is_a(2) (?P1 some ?AND)
+}
+
+COMPLETION "some_only_and_or_1"
+IF {
+  ?P1 subproperty_of ?P
+  ?ONLY is_a (?P  only ?W1)
+  ?ONLY_OR = (?ONLY or ?...)
+  ?A    is_a(<=3) ?ONLY_OR
+  ?A    is_a (?P1 some ?V1)
+  ?AND = (?V and ?W)
+  ?AND = (?ZZZ and) # Ensure that ?AND is not an inner component of an intersection with more than 2 elements
+  ?V1 is_a ?V
+  ?W1 is_a ?W
+}
+INFER {
+  ?A is_a(2) ((?P1 some ?AND) or ?...)
+}
+
+COMPLETION "some_only_and_or_2"
+IF {
+  ?P1 subproperty_of ?P
+  ?A    is_a (?P  only ?W1)
+  ?SOME is_a (?P1 some ?V1)
+  ?SOME_OR = (?SOME or ?...)
+  ?A is_a(<=3) ?SOME_OR
+  ?AND = (?V and ?W)
+  ?AND = (?ZZZ and) # Ensure that ?AND is not an inner component of an intersection with more than 2 elements
+  ?V1 is_a ?V
+  ?W1 is_a ?W
+}
+INFER {
+  ?A is_a(2) ((?P1 some ?AND) or ?...)
+}
+
+COMPLETION LOWEST_PRIORITY "some_only_and_or_3"
+IF {
+  ?P1 subproperty_of ?P
+  ?ONLY is_a (?P  only ?W1)
+  ?SOME is_a (?P1 some ?V1)
+  ?ONLY_OR = (?ONLY or ?...)
+  ?SOME_OR = (?SOME or ?...)
+  ?A is_a(<=3) ?ONLY_OR
+  ?A is_a(<=3) ?SOME_OR
+  ?ONLY_OR != ?SOME_OR
+  ?AND = (?V and ?W)
+  ?AND = (?XXX and) # Ensure that ?AND is not an inner component of an intersection with more than 2 elements
+  ?V1 is_a ?V
+  ?W1 is_a ?W
+}
+INFER {
+  ?A is_a(2) ((?P1 some ?AND) or ?...)
+}
+
+
+COMPLETION LOWEST_PRIORITY "some_only_disjoint"
+IF {
+  ?A is_a (?P1 some ?W1)
+  ?A is_a (?P  only ?V1)
+  ?P1 subproperty_of ?P
+  ?D disjoint_member ?V
+  ?D disjoint_member ?W
+  ?V != ?W
+  ?V1 is_a ?V
+  ?W1 is_a ?W
+}
+INFER {
+  ?A is_a(2) Nothing
+}
+
+COMPLETION LOWEST_PRIORITY "some_only_disjoint_or_1"
+IF {
+  ?P1 subproperty_of ?P
+  ?ONLY is_a (?P  only ?W1)
+  ?ONLY_OR = (?ONLY or ?...)
+  ?A    is_a(<=3) ?ONLY_OR
+  ?A    is_a (?P1 some ?V1)
+  ?D disjoint_member ?V
+  ?D disjoint_member ?W
+  ?V != ?W
+  ?V1 is_a ?V
+  ?W1 is_a ?W
+}
+INFER {
+  ?A is_a(2) (?... or)
+}
+
+COMPLETION LOWEST_PRIORITY "some_only_disjoint_or_2"
+IF {
+  ?P1 subproperty_of ?P
+  ?A    is_a (?P  only ?W1)
+  ?SOME is_a (?P1 some ?V1)
+  ?SOME_OR = (?SOME or ?...)
+  ?A is_a(<=3) ?SOME_OR
+  ?D disjoint_member ?V
+  ?D disjoint_member ?W
+  ?V != ?W
+  ?V1 is_a ?V
+  ?W1 is_a ?W
+}
+INFER {
+  ?A is_a(2) (?... or)
+}
+
+COMPLETION LOWEST_PRIORITY "some_only_disjoint_or_3"
+IF {
+  ?P1 subproperty_of ?P
+  ?ONLY is_a (?P  only ?W1)
+  ?SOME is_a (?P1 some ?V1)
+  ?ONLY_OR = (?ONLY or ?...)
+  ?SOME_OR = (?SOME or ?...)
+  ?A is_a(<=3) ?ONLY_OR
+  ?A is_a(<=3) ?SOME_OR
+  ?ONLY_OR != ?SOME_OR
+  ?D disjoint_member ?V
+  ?D disjoint_member ?W
+  ?V != ?W
+  ?V1 is_a ?V
+  ?W1 is_a ?W
+}
+INFER {
+  ?A is_a(2) (?... or)
+}
+
+
+
+
+COMPLETION "some_only_inverse_1"
+IF {
+  ?M = (?P1 some ?N)
+  ?P1 subproperty_of ?P
+  ?N is_a ((inverse ?P) only ?A)
+}
+INFER {
+  ?M is_a(1) ?A
+}
+
+COMPLETION "some_only_inverse_or_1"
+IF {
+  ?M = (?P1 some ?N1)
+  ?P1 subproperty_of ?P
+  ?N1 is_a(<=3) (?N or ?...)
+  ?N  is_a ((inverse ?P) only ?A)
+}
+INFER {
+  ?M is_a(1) (?A or (?P some (?... or))) # XXX is_a(4) ?
+}
+
+
+# COMPLETION "some_func"
+# IF {
+#   ?P1 subproperty_of ?P
+#   ?P type FunctionalProperty
+#   ?A = (?P1 some  ?V1)
+# }
+# INFER {
+#   ?A is_a(1) (?P only ?V1)
+# }
+
+COMPLETION LOW_PRIORITY "some_func_1"
+#COMPLETION "some_func_1"
+IF {
+  ?P type FunctionalProperty
+  ?P1 subproperty_of ?P
+  ?P2 subproperty_of ?P
+  ?A is_a (?P1 some  ?V1)
+  ?A is_a (?P2 some  ?V2)
+  ?V1 NOT_is_a ?V2
+  ?V2 NOT_is_a ?V1
+  ?V1 < ?V2
+}
+INFER {
+  ?A is_a(2) (?P only ?V1)
+  ?A is_a(2) (?P only ?V2)
+}
+COMPLETION "some_func_2"
+IF {
+  ?P type FunctionalProperty
+  ?P1 subproperty_of ?P
+  ?A is_a (?P1 some  ?V1)
+  
+  ?P2 subproperty_of ?P
+  ?ONLY = (?P2 only ?V)
+  ?V1 is_a ?V
+}
+INFER {
+  ?A is_a(2) ?ONLY
+}
+
+
+
+COMPLETION "some_func_or"
+IF {
+  ?P1 subproperty_of ?P
+  ?P type FunctionalProperty
+  ?A = ((?P1 some  ?N1) or ?...)
+}
+INFER {
+  ?A is_a(1) ((?P only ?N1) or ?...)
+}
+
+#####################################################################
+
+COMPLETION "inconsistency"
+IF {
+  ?X type NamedIndividual
+#  ?X concrete
+  ?X > 0
+  ?X is_a Nothing
+}
+RAISE "OwlReadyInconsistentOntologyError"
+
+
+COMPLETION "individual_1"
+IF {
+  ?B type NamedIndividual
+  ?A is_a ?B
+  ?A concrete
+}
+INFER {
+  ?B is_a(2) ?A
+}
+
+
+PREPROCESS "concrete_individual"
+IF {
+  ?B type NamedIndividual
+}
+INFER {
+  ?B concrete
+}
+
+COMPLETION "concrete_is_a"
+IF {
+  ?A concrete
+  ?A is_a ?B
+  ?B != Thing
+}
+INFER {
+  ?B concrete
+}
+
+COMPLETION "concrete_some"
+IF {
+  (?P some ?B) concrete
+  ?B != Thing
+}
+INFER {
+  ?B concrete
+}
+
+COMPLETION "concrete_or"
+IF {
+  ?OR = (?A or ?B)
+  ?OR concrete
+  ?A is_a Nothing
+  ?B != Thing
+}
+INFER {
+  ?B concrete
+}
+
+

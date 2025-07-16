@@ -1,0 +1,175 @@
+
+
+COMPLETION "some_only_and_or_2"
+IF {
+  ?P1 subproperty_of ?P
+  ?A    is_a (?P  only ?W1)
+  ?SOME is_a (?P1 some ?V1)
+  ?SOME_OR = (?SOME or ?...)
+  ?A is_a ?SOME_OR
+  ?AND = (?V and ?W)
+  ?AND is_a Thing # Ensure that ?AND is not an inner component of an intersection with more than 2 elements
+  ?V1 is_a ?V
+  ?W1 is_a ?W
+}
+INFER {
+  ?A is_a(2) ((?P1 some ?AND) or ?...)
+}
+
+{'?_clause_s_6=-21', '?P1=302', '?...=[-16]', '?AND=-14', '?_clause_o_6=-10', '?A=308'}
+{'?A=C1', '?_clause_s_6=((p1 some (C1 and C2 and C3)) or ((p1 some C3) and C2))', '?_clause_o_6=((p1 some C3) and C2)', '?AND=(C2 and C3)', "?...=['(p1 some (C1 and C2 and C3))']", '?P1=p1'}
+
+?A   =  C1
+?AND = (C2 and C3)
+?_clause_s_6 = ((p1 some (C1 and C2 and C3)) or ((p1 some C3) and C2))
+?_clause_o_6 = ((p1 some C3) and C2)
+?... = ['(p1 some (C1 and C2 and C3))']
+
+?A=308
+?AND=-14
+?_clause_s_6=-21
+?_clause_o_6=-10
+?...=[-16]
+
+-35 : ((p1 some (C2 and C3)) or (p1 some (C1 and C2 and C3)))
+
+
+
+
+
+
+COMPLETION "infer_descendants_entity"
+IF {
+  ?A > 0
+}
+INFER {
+  ?A infer_descendants
+}
+
+COMPLETION "infer_ancestors_entity"
+IF {
+  ?A > 0
+}
+INFER {
+  ?A infer_ancestors
+}
+
+
+COMPLETION "infer_descendants_and"
+IF {
+  ?AND = (?X and)
+  ?AND is_a ?Y
+  ?Y infer_descendants
+}
+INFER {
+  ?AND infer_descendants
+}
+
+COMPLETION "infer_descendants_or"
+IF {
+  ?OR = (?X or)
+  ?OR is_a ?Y
+  ?Y infer_descendants
+}
+INFER {
+  ?OR infer_descendants
+}
+
+COMPLETION "infer_ancestors_and"
+IF {
+  ?AND = (?X and)
+  ?AND is_a ?Y
+  ?Y infer_ancestors
+}
+INFER {
+  ?AND infer_ancestors
+}
+
+COMPLETION "infer_ancestors_or"
+IF {
+  ?OR = (?X or)
+  ?OR is_a ?Y
+  ?Y infer_ancestors
+}
+INFER {
+  ?OR infer_ancestors
+}
+
+
+
+COMPLETION "infer_descendants_inner_1"
+IF {
+  ?AND = (?INNER_AND and)
+  ?INNER_AND = (?X and)
+  ?AND infer_descendants
+}
+INFER {
+  ?INNER_AND infer_descendants
+}
+
+COMPLETION "infer_descendants_inner_2"
+IF {
+  ?OR = (?INNER_AND or)
+  ?INNER_AND = (?X and)
+  ?OR infer_descendants
+}
+INFER {
+  ?INNER_AND infer_descendants
+}
+
+COMPLETION "infer_ancestors_inner_1"
+IF {
+  ?AND = (?INNER_AND and)
+  ?INNER_AND = (?X and)
+  ?AND infer_ancestors
+}
+INFER {
+  ?INNER_AND infer_ancestors
+}
+
+COMPLETION "infer_ancestors_inner_2"
+IF {
+  ?OR = (?INNER_AND or)
+  ?INNER_AND = (?X and)
+  ?OR infer_ancestors
+}
+INFER {
+  ?INNER_AND infer_ancestors
+}
+
+
+COMPLETION "infer_descendants_some"
+IF {
+  ?SOME infer_descendants
+  ?SOME = (?P some ?V)
+}
+INFER {
+  ?V infer_descendants
+}
+
+COMPLETION "infer_ancestors_some"
+IF {
+  ?SOME infer_ancestors
+  ?SOME = (?P some ?V)
+}
+INFER {
+  ?V infer_ancestors
+}
+
+COMPLETION "infer_descendants_only"
+IF {
+  ?ONLY infer_descendants
+  ?ONLY = (?P only ?V)
+}
+INFER {
+  ?V infer_ancestors
+}
+
+COMPLETION "infer_ancestors_only"
+IF {
+  ?ONLY infer_ancestors
+  ?ONLY = (?P only ?V)
+}
+INFER {
+  ?V infer_descendants
+}

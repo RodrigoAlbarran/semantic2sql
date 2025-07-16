@@ -1,0 +1,367 @@
+STAGE "1 Initialize"
+
+PREPROCESS "equivalence"
+IF    { ?A equivalent_class ?B }
+OR    { ?B equivalent_class ?A }
+INFER { ?A is_a(1) ?B }
+
+
+PREPROCESS "and_flat_list" BUILTIN "CreateFlatList" { <http://www.w3.org/2002/07/owl#intersectionOf> }
+
+PREPROCESS "or_flat_list" BUILTIN "CreateFlatList" { <http://www.w3.org/2002/07/owl#unionOf>
+                                                     <http://www.w3.org/2002/07/owl#oneOf> }
+                                              
+PREPROCESS "disjoint_flat_list" BUILTIN "CreateFlatList" { <http://www.w3.org/2002/07/owl#members>
+                                                           <http://www.w3.org/2002/07/owl#distinctMembers> }
+
+PREPROCESS "not_flat_list" BUILTIN "CreateSingleElementFlatList" { <http://www.w3.org/2002/07/owl#complementOf> }
+
+PREPROCESS "inverse_flat_list" BUILTIN "CreateSingleElementFlatList" { <http://www.w3.org/2002/07/owl#inverseOf> }
+
+
+PREPROCESS "normalize_constructs" BUILTIN "NormalizeConstructs" {  }
+
+PREPROCESS "or_key_list" BUILTIN "CreateKeyList" { <http://www.w3.org/2002/07/owl#unionOf> }
+
+PREPROCESS RECURSIVE "prop_is_a_transitivity"
+IF {
+  ?A subproperty_of ?B
+  ?B subproperty_of ?C
+}
+INFER {
+  ?A subproperty_of ?C
+}
+
+PREPROCESS "domain"
+IF {
+  ?P domain ?D
+  ?D != Thing
+  ?A = (?P some ?V)
+}
+INFER {
+  ?A is_a(1) ?D
+}
+
+PREPROCESS "range"
+IF {
+  ?P range ?R
+  ?R != Thing
+}
+INFER {
+  Thing is_a(1) (?P only ?R)
+}
+
+#####################################################################
+
+STAGE "2 Determine needed inferences"
+
+PREPROCESS "infer_descendants_entity"
+IF {
+  ?A type Class
+  ?A > 0
+}
+OR {
+  ?A type NamedIndividual
+  ?A > 0
+}
+INFER {
+  ?A infer_descendants
+}
+
+PREPROCESS "infer_ancestors_entity"
+IF {
+  ?A type Class
+  ?A > 0
+}
+OR {
+  ?A type NamedIndividual
+  ?A > 0
+}
+INFER {
+  ?A infer_ancestors
+}
+
+COMPLETION "infer_descendants_is_a"
+IF {
+  ?X is_a ?Y
+  ?Y infer_descendants
+}
+INFER {
+  ?X infer_descendants
+}
+
+COMPLETION "infer_ancestors_is_a"
+IF {
+  ?Y is_a ?X
+  ?Y infer_ancestors
+}
+INFER {
+  ?X infer_ancestors
+}
+
+COMPLETION "infer_descendants_inner_1"
+IF {
+  ?OUTER = (?INNER and)
+  ?OUTER infer_descendants
+}
+INFER {
+  ?INNER infer_descendants
+}
+
+COMPLETION "infer_descendants_inner_2"
+IF {
+  ?OUTER = (?INNER or)
+  ?OUTER infer_descendants
+}
+INFER {
+  ?INNER infer_descendants
+}
+
+COMPLETION "infer_ancestors_inner_1"
+IF {
+  ?OUTER = (?INNER and)
+  ?OUTER infer_ancestors
+}
+INFER {
+  ?INNER infer_ancestors
+}
+
+COMPLETION "infer_ancestors_inner_2"
+IF {
+  ?OUTER = (?INNER or)
+  ?OUTER infer_ancestors
+}
+INFER {
+  ?INNER infer_ancestors
+}
+
+COMPLETION "infer_descendants_some"
+IF {
+  ?SOME infer_descendants
+  ?SOME = (?P some ?V)
+}
+INFER {
+  ?V infer_descendants
+}
+
+COMPLETION "infer_ancestors_some"
+IF {
+  ?SOME infer_ancestors
+  ?SOME = (?P some ?V)
+}
+INFER {
+  ?V infer_ancestors
+}
+
+COMPLETION "infer_descendants_only"
+IF {
+  ?ONLY infer_ancestors
+  ?ONLY = (?P only ?V)
+}
+INFER {
+  ?V infer_descendants
+}
+
+COMPLETION "infer_ancestors_only"
+IF {
+  ?ONLY infer_descendants
+  ?ONLY = (?P only ?V)
+}
+INFER {
+  ?V infer_ancestors
+}
+
+#####################################################################
+
+STAGE "3 Create linked lists"
+
+PREPROCESS "and_linked_list" BUILTIN "CreateLinkedList" { <http://www.w3.org/2002/07/owl#intersectionOf> }
+
+PREPROCESS "or_linked_list" BUILTIN "CreateLinkedList" { <http://www.w3.org/2002/07/owl#unionOf> }
+
+#####################################################################
+
+STAGE "4 Compute inferences"
+
+PREPROCESS "prop_is_a_self"
+IF    { ?A type ObjectProperty }
+OR    { ?A type DatatypeProperty }
+INFER { ?A subproperty_of ?A }
+
+COMPLETION "is_a_self"
+IF    { ?A type Class } # Also include or, and, not
+OR    { ?A type NamedIndividual }
+#OR    { ?A = (?X subproperty_of ?Y)}
+OR    { ?A = (?R some ?X) }
+OR    { ?A = (?R only ?X) }
+INFER { ?A is_a(3) ?A }
+
+COMPLETION "is_a_thing"
+IF    { ?A type Class } # Also include or, and, not
+OR    { ?A type NamedIndividual }
+#OR    { ?A = (?X subproperty_of ?Y)}
+OR    { ?A = (?R some ?X) }
+OR    { ?A = (?R only ?X) }
+#OR    { ?A = (?R max ?nb ?X) }
+INFER { ?A is_a(2) Thing }
+
+PREPROCESS "nothing"
+IF { } INFER {
+  Nothing is_a(2) Thing
+  Nothing is_a(2) Nothing
+  new (Thing pairwise_disjoint Nothing)
+}
+
+COMPLETION "and_2_or_1"
+IF {
+  ?AND = (?X and ?Y)
+  ?A  is_a(<=3) (?X1 or ?...)
+  #?X1_OR = (?X1 or ?...)
+  #?A  is_a(<=3) ?X1_OR
+  ?A  is_a ?Y
+  ?X1 is_a ?X
+#  ?Y != ?X1_OR
+#  ?A != ?AND
+}
+INFER {
+  ?A is_a(2) (?AND or ?...)
+}
+
+PREPROCESS "not"
+IF {
+  ?NOT = (not ?A)
+}
+INFER {
+  new (?A pairwise_disjoint ?NOT)
+  Thing is_a(1) (?A or ?NOT)
+}
+
+PREPROCESS "disjoint_pair"
+IF {
+  ?A disjoint_with ?B
+}
+INFER {
+  new (?A pairwise_disjoint ?B)
+}
+
+COMPLETION "disjoint_1"
+IF {
+  ?D disjoint_member ?A
+  ?D disjoint_member ?B
+  ?A < ?B
+  ?X is_a ?A
+  ?X is_a ?B
+}
+INFER {
+  ?X is_a(2) Nothing
+}
+#####################################################################
+COMPLETION HIGH_PRIORITY "some_subprop_subclass"
+IF {
+  ?SOME  = (?P  some ?V)
+  ?SOME1 = (?P1 some ?V1)
+  ?SOME1 != ?SOME
+  ?P1 subproperty_of ?P
+  ?V1 is_a ?V
+}
+INFER {
+  ?SOME1 is_a(1) ?SOME
+}
+
+COMPLETION "some_or"
+IF {
+  ?P1 subproperty_of ?P
+  ?SOME = (?P1 some ?V)
+#  ?SOME infer_ancestors
+  ?V is_a(<=3) (?A or ?...)
+}
+INFER {
+  ?SOME is_a(1) ((?P1 some ?A) or ?...)
+}
+#####################################################################
+COMPLETION HIGH_PRIORITY "some_nothing"
+IF {
+  ?A = (?P some ?V)
+  ?V is_a Nothing
+}
+INFER {
+  ?A is_a(1) Nothing
+}
+
+COMPLETION HIGH_PRIORITY "only_subprop_subclass"
+IF {
+  ?ONLY  = (?P1 only ?V)
+  ?ONLY1 = (?P  only ?V1)
+  ?ONLY1 != ?ONLY
+  ?V1 is_a ?V
+  ?P1 subproperty_of ?P
+}
+INFER {
+  ?ONLY1 is_a(1) ?ONLY
+}
+
+#####################################################################
+######   MY RULES 
+#####################################################################                                                        
+                                                        
+                                                        
+                                                        
+#####################################################################
+
+COMPLETION "inconsistency"
+IF {
+  ?X type NamedIndividual
+#  ?X concrete
+  ?X > 0
+  ?X is_a Nothing
+}
+RAISE "OwlReadyInconsistentOntologyError"
+
+
+COMPLETION "individual_1"
+IF {
+  ?B type NamedIndividual
+  ?A is_a ?B
+  ?A concrete
+}
+INFER {
+  ?B is_a(2) ?A
+}
+
+PREPROCESS "concrete_individual"
+IF {
+  ?B type NamedIndividual
+}
+INFER {
+  ?B concrete
+}
+
+COMPLETION "concrete_is_a"
+IF {
+  ?A concrete
+  ?A is_a ?B
+  ?B != Thing
+}
+INFER {
+  ?B concrete
+}
+
+COMPLETION "concrete_some"
+IF {
+  (?P some ?B) concrete
+  ?B != Thing
+}
+INFER {
+  ?B concrete
+}
+
+COMPLETION "concrete_or"
+IF {
+  ?OR = (?A or ?B)
+  ?OR concrete
+  ?A is_a Nothing
+  ?B != Thing
+}
+INFER {
+  ?B concrete
+}
